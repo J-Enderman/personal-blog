@@ -1,0 +1,41 @@
+theme: "hugo-PaperMod"
+baseURL: https://www.enderman.eu/
+languageCode: en-us
+title: Blog of many things
+relativeURLs: true
+enableEmoji: true
+
+enableRobotsTXT: true
+
+minify:
+    disableXML: true
+    minifyOutput: true
+
+params:
+    # defaultTheme: light
+    # defaultTheme: dark
+    defaultTheme: auto # to switch between dark or light according to browser theme
+    disableThemeToggle: false
+    homeInfoParams:
+        Title: Heya, welcome
+        Content: I intend to write here about the many things that capture my mind.
+    ShowReadingTime: true
+    ShowBreadCrumbs: true
+    env: production
+    
+outputs:
+    home:
+        - HTML
+        - RSS
+        - JSON # is necessary
+        
+menu:
+    main:
+        - identifier: categories
+          name: categories
+          url: /categories/
+          weight: 10
+        - identifier: tags
+          name: tags
+          url: /tags/
+          weight: 20

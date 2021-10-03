@@ -1,0 +1,63 @@
+---
+title: Multidimentional k-anonymity
+author: Jasper Enderman
+date: '2021-04-12'
+slug: [multidimentional-k-anonymity]
+categories:
+  - R
+  - Privacy
+tags:
+  - k-anonymity
+  - clustering
+  - microdata anonymization
+  - data utility
+bibliography: [../ref.bib]
+csl: ../vancouver-brackets.csl
+
+---
+
+[K-anonymity](https://en.wikipedia.org/wiki/K-anonymity) is hard, besides the common mistakes (such as missing quasi-identifiers or using a too small value of k) @WP29-216 it is also an NP-hard problem to try and optimize data utility @meyerson2004complexity. One of the ways to optimize utility and determine which combination of methods stays under the required threshold (e.g. no equivalence classes smaller than k) is to apply every combination of methods and determine which is best. This is the technique used in the PHUSE white paper on data anonymisation from 2020 @PHUSEauto.
+
+Trying every possible combination works well when the dimensionality is low, and each variable has a low number of options that can be applied. However this process is plagued by the [curse of dimensionality](https://en.wikipedia.org/wiki/Curse_of_dimensionality). This results in sub-optimal banding, due to the fact that not every single possible band can be tried. Using the following data I'll illustrate some of the issue with common ways of banding microdata.
+
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+library(tibble)
+library(sdcMicro)
+library(knitr)
+
+set.seed(100)
+x <- tibble("age" = sample(45:55,15, replace = TRUE,), 
+            "sex" = sample(0:1,15,replace = TRUE))
+x <- x[order(x$age, x$sex),][1:7,]
+x$subject <- rownames(x)
+x
+```
+Even if we have a k of 2, we have to make a band from 46 to 50 when using single dimentional banding. This because the subjects with age 46 and sex 0 does not have a closer aged subject with the same sex. However this reduces the utility of the subjects with sex 1 in that range. Subjects 2 and 3 could have shared a band of 47-48 instead of be included in 46-50.
+
+A second issue is that not everyone uses overlapping bands, in this case subject 5, 6 and 7 would likely be included in the 46-50 band, even though they could perfectly form a band together of 50-50.
+
+Multidimentional banding introduces a type of stratification, in case of the example we treat sex 0 and sex 1 differently and give both a different set of bands.
+
+One of the first articles I read about this technique was "Mondrian Multidimensional K-Anonymity" @lefevre2006mondrian. It immediately grabbed my attention because the problem and solution seem so obvious. Now, to be clear, I am not a statistician, and found myself having to go back to my biostats coursebook. So after a small headache I decided to do this my way, the easy way.
+
+We can stratify using the R package ["sdcMicro"](https://cran.r-project.org/web/packages/sdcMicro/index.html), this makes it really easy to do some simple but effective banding.
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+
+y <- createSdcObj(x, keyVars = "subject", strataVar = "sex",numVars = "age")
+y <- microaggregation(y, aggr = 2)
+z <- cbind(x, aggr_age=(y@manipNumVars$age))
+z$group <- paste0(z$sex, z$aggr_age)
+
+for (i in 1:nrow(z)){
+z$age_band[i] <- paste0(
+  min(z$age[z$group == paste0(z$sex,z$aggr_age)[i]]),
+  "-",
+  max(z$age[z$group == paste0(z$sex, z$aggr_age)[i]]))
+}
+z[c(6,1,2,3)]
+```
+
+Using this package we can also add more dimensions, for example in case we would want to band BMI too. Using the "method" option in the microaggregation() function we can also select our preferred clustering algorithm. 
+
+------

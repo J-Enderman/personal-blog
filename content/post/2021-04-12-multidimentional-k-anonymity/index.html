@@ -1,0 +1,84 @@
+---
+title: Multidimentional k-anonymity
+author: Jasper Enderman
+date: '2021-04-12'
+slug: [multidimentional-k-anonymity]
+categories:
+  - R
+  - Privacy
+tags:
+  - k-anonymity
+  - clustering
+  - microdata anonymization
+  - data utility
+bibliography: [../ref.bib]
+csl: ../vancouver-brackets.csl
+
+---
+
+<script src="{{< blogdown/postref >}}index_files/header-attrs/header-attrs.js"></script>
+
+
+<p><a href="https://en.wikipedia.org/wiki/K-anonymity">K-anonymity</a> is hard, besides the common mistakes (such as missing quasi-identifiers or using a too small value of k) <span class="citation">[<a href="#ref-WP29-216" role="doc-biblioref">1</a>]</span> it is also an NP-hard problem to try and optimize data utility <span class="citation">[<a href="#ref-meyerson2004complexity" role="doc-biblioref">2</a>]</span>. One of the ways to optimize utility and determine which combination of methods stays under the required threshold (e.g. no equivalence classes smaller than k) is to apply every combination of methods and determine which is best. This is the technique used in the PHUSE white paper on data anonymisation from 2020 <span class="citation">[<a href="#ref-PHUSEauto" role="doc-biblioref">3</a>]</span>.</p>
+<p>Trying every possible combination works well when the dimensionality is low, and each variable has a low number of options that can be applied. However this process is plagued by the <a href="https://en.wikipedia.org/wiki/Curse_of_dimensionality">curse of dimensionality</a>. This results in sub-optimal banding, due to the fact that not every single possible band can be tried. Using the following data I’ll illustrate some of the issue with common ways of banding microdata.</p>
+<pre class="r"><code>library(tibble)
+library(sdcMicro)
+library(knitr)
+
+set.seed(100)
+x &lt;- tibble(&quot;age&quot; = sample(45:55,15, replace = TRUE,), 
+            &quot;sex&quot; = sample(0:1,15,replace = TRUE))
+x &lt;- x[order(x$age, x$sex),][1:7,]
+x$subject &lt;- rownames(x)
+x</code></pre>
+<pre><code>## # A tibble: 7 x 3
+##     age   sex subject
+##   &lt;int&gt; &lt;int&gt; &lt;chr&gt;  
+## 1    46     0 1      
+## 2    47     1 2      
+## 3    48     1 3      
+## 4    50     0 4      
+## 5    50     1 5      
+## 6    50     1 6      
+## 7    50     1 7</code></pre>
+<p>Even if we have a k of 2, we have to make a band from 46 to 50 when using single dimentional banding. This because the subjects with age 46 and sex 0 does not have a closer aged subject with the same sex. However this reduces the utility of the subjects with sex 1 in that range. Subjects 2 and 3 could have shared a band of 47-48 instead of be included in 46-50.</p>
+<p>A second issue is that not everyone uses overlapping bands, in this case subject 5, 6 and 7 would likely be included in the 46-50 band, even though they could perfectly form a band together of 50-50.</p>
+<p>Multidimentional banding introduces a type of stratification, in case of the example we treat sex 0 and sex 1 differently and give both a different set of bands.</p>
+<p>One of the first articles I read about this technique was “Mondrian Multidimensional K-Anonymity” <span class="citation">[<a href="#ref-lefevre2006mondrian" role="doc-biblioref">4</a>]</span>. It immediately grabbed my attention because the problem and solution seem so obvious. Now, to be clear, I am not a statistician, and found myself having to go back to my biostats coursebook. So after a small headache I decided to do this my way, the easy way.</p>
+<p>We can stratify using the R package <a href="https://cran.r-project.org/web/packages/sdcMicro/index.html">“sdcMicro”</a>, this makes it really easy to do some simple but effective banding.</p>
+<pre class="r"><code>y &lt;- createSdcObj(x, keyVars = &quot;subject&quot;, strataVar = &quot;sex&quot;,numVars = &quot;age&quot;)
+y &lt;- microaggregation(y, aggr = 2)
+z &lt;- cbind(x, aggr_age=(y@manipNumVars$age))
+z$group &lt;- paste0(z$sex, z$aggr_age)
+
+for (i in 1:nrow(z)){
+z$age_band[i] &lt;- paste0(
+  min(z$age[z$group == paste0(z$sex,z$aggr_age)[i]]),
+  &quot;-&quot;,
+  max(z$age[z$group == paste0(z$sex, z$aggr_age)[i]]))
+}
+z[c(6,1,2,3)]</code></pre>
+<pre><code>##   age_band age sex subject
+## 1    46-50  46   0       1
+## 2    47-48  47   1       2
+## 3    47-48  48   1       3
+## 4    46-50  50   0       4
+## 5    50-50  50   1       5
+## 6    50-50  50   1       6
+## 7    50-50  50   1       7</code></pre>
+<p>Using this package we can also add more dimensions, for example in case we would want to band BMI too. Using the “method” option in the microaggregation() function we can also select our preferred clustering algorithm.</p>
+<hr />
+<div id="refs" class="references csl-bib-body">
+<div id="ref-WP29-216" class="csl-entry">
+<div class="csl-left-margin">1. </div><div class="csl-right-inline">Article 29 Data Protection Working Party. <span class="nocase">Opinion 05/2014 on anonymisation techniques</span> [Internet]. 2014. Available from: <a href="https://ec.europa.eu/justice/article-29/documentation/opinion-recommendation/files/2014/wp216_en.pdf">https://ec.europa.eu/justice/article-29/documentation/opinion-recommendation/files/2014/wp216_en.pdf</a></div>
+</div>
+<div id="ref-meyerson2004complexity" class="csl-entry">
+<div class="csl-left-margin">2. </div><div class="csl-right-inline">Meyerson A, Williams R. On the complexity of optimal k-anonymity. In: Proceedings of the twenty-third ACM SIGMOD-SIGACT-SIGART symposium on principles of database systems [Internet]. 2004. p. 223–8. Available from: <a href="http://www.cs.cmu.edu/ ryanw/kanon-pods04.pdf">http://www.cs.cmu.edu/ ryanw/kanon-pods04.pdf</a></div>
+</div>
+<div id="ref-PHUSEauto" class="csl-entry">
+<div class="csl-left-margin">3. </div><div class="csl-right-inline">PHUSE Data Transparency Working Group. Data anonymisation and risk assessment automation. PHUSE Deliverables [Internet]. 2020;22. Available from: <a href="https://phuse.s3.eu-central-1.amazonaws.com/Deliverables/Data Transparency/Data Anonymisation and Risk Assessment Automation.pdf">https://phuse.s3.eu-central-1.amazonaws.com/Deliverables/Data Transparency/Data Anonymisation and Risk Assessment Automation.pdf</a></div>
+</div>
+<div id="ref-lefevre2006mondrian" class="csl-entry">
+<div class="csl-left-margin">4. </div><div class="csl-right-inline">LeFevre K, DeWitt DJ, Ramakrishnan R. Mondrian multidimensional k-anonymity. In: 22nd international conference on data engineering (ICDE’06) [Internet]. IEEE; 2006. p. 25–5. Available from: <a href="http://pages.cs.wisc.edu/ lefevre/MultiDim.pdf">http://pages.cs.wisc.edu/ lefevre/MultiDim.pdf</a></div>
+</div>
+</div>

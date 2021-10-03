@@ -1,2 +1,2 @@
-# personal-blog
-My personal blog, hosted on enderman.eu
+# Jasper's blog
+This blog has been written in R markdown.
