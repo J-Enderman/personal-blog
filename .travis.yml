@@ -1,0 +1,6 @@
+dist: focal
+ addons:
+   snaps:
+    - hugo
+script:
+ - hugo
