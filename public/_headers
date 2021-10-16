@@ -5,3 +5,4 @@
   Content-Security-Policy:  default-src 'none'; img-src 'self' *.enderman.eu ; script-src 'unsafe-inline' *.enderman.eu ; style-src 'self' *.enderman.eu ; form-action 'self' *.enderman.eu
   Referrer-Policy: strict-origin-when-cross-origin
   Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+  Onion-Location: http://endermanv7jetgfcjqsgizdxmqbdhjjznv2aycgs23kvgfglst5patad.onion
